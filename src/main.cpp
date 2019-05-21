@@ -178,7 +178,7 @@ void debugCallback() {
     DLOG("Resetting Roomba\n");
     roomba.reset();
   } else if (cmd == "mqtthello") {
-    mqttClient.publish("vacuum/hello", "hello there");
+    mqttClient.publish(statusTopic, "hello there");
   } else if (cmd == "version") {
     const char compile_date[] = __DATE__ " " __TIME__;
     DLOG("Compiled on: %s\n", compile_date);
@@ -236,8 +236,12 @@ void sleepIfNecessary() {
     // Fire off a quick message with our most recent state, if MQTT is connected
     DLOG("Battery voltage is low (%.1fV). Sleeping for 10 minutes\n", mV / 1000);
     if (mqttClient.connected()) {
-      StaticJsonBuffer<200> jsonBuffer;
-      JsonObject& root = jsonBuffer.createObject();
+//Breaking changes from ArduinoJSON 5 -> ArduinoJSON 6 
+//      StaticJsonBuffer<200> jsonBuffer;
+//      JsonObject root = jsonBuffer.createObject();
+//Fixed Lines
+      StaticJsonDocument<200> jsonBuffer;
+      JsonObject root = jsonBuffer.to<JsonObject>();
       root["battery_level"] = 0;
       root["cleaning"] = false;
       root["docked"] = false;
@@ -245,7 +249,10 @@ void sleepIfNecessary() {
       root["voltage"] = mV / 1000;
       root["charge"] = 0;
       String jsonStr;
-      root.printTo(jsonStr);
+//Breaking changes from ArduinoJSON 5 -> ArduinoJSON 6 
+//  root.printTo(jsonStr);
+//Fixed Lines
+      serializeJson(root, jsonStr);
       mqttClient.publish(statusTopic, jsonStr.c_str(), true);
     }
     delay(200);
@@ -255,6 +262,7 @@ void sleepIfNecessary() {
   }
 #endif
 }
+
 
 bool parseRoombaStateFromStreamPacket(uint8_t *packet, int length, RoombaState *state) {
   state->timestamp = millis();
@@ -405,9 +413,15 @@ void sendStatus() {
     return;
   }
   DLOG("Reporting packet Distance:%dmm ChargingState:%d Voltage:%dmV Current:%dmA Charge:%dmAh Capacity:%dmAh\n", roombaState.distance, roombaState.chargingState, roombaState.voltage, roombaState.current, roombaState.charge, roombaState.capacity);
-  StaticJsonBuffer<200> jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-  root["battery_level"] = (roombaState.charge * 100)/roombaState.capacity;
+//Breaking changes from ArduinoJSON 5 -> ArduinoJSON 6 
+//  StaticJsonBuffer<200> jsonBuffer;
+//  JsonObject root = jsonBuffer.createObject();
+//Fixed Lines
+  StaticJsonDocument<200> jsonBuffer;
+  JsonObject root = jsonBuffer.to<JsonObject>();
+
+//  root["battery_level"] = (roombaState.charge * 100)/roombaState.capacity;
+  root["battery_level"] = roombaState.capacity > 0 ? (roombaState.charge * 100) / roombaState.capacity : (roombaState.charge * 100) / 2697;
   root["cleaning"] = roombaState.cleaning;
   root["docked"] = roombaState.docked;
   root["charging"] = roombaState.chargingState == Roomba::ChargeStateReconditioningCharging
@@ -417,8 +431,12 @@ void sendStatus() {
   root["current"] = roombaState.current;
   root["charge"] = roombaState.charge;
   String jsonStr;
-  root.printTo(jsonStr);
+//Breaking changes from ArduinoJSON 5 -> ArduinoJSON 6 
+//  root.printTo(jsonStr);
+//Fixed Lines
+  serializeJson(root, jsonStr);
   mqttClient.publish(statusTopic, jsonStr.c_str());
+
 }
 
 int lastStateMsgTime = 0;
